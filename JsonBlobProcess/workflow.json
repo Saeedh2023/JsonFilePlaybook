@@ -1,159 +1,142 @@
 {
-  "definition": {
-    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
-    "actions": {
-      "Parse_JSON": {
-        "type": "ParseJson",
-        "inputs": {
-          "content": "@body('Read_blob_content_based_on_URI')?['content']",
-          "schema": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "integer"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "details": {
-                  "type": "object",
-                  "properties": {
-                    "type": {
-                      "type": "string"
-                    },
-                    "severity": {
-                      "type": "integer"
-                    }
-                  }
-                },
-                "user": {
-                  "type": "string"
-                },
-                "ip": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "details",
-                "user",
-                "ip"
-              ]
-            }
-          }
-        },
-        "runAfter": {
-          "Read_blob_content_based_on_URI": [
-            "SUCCEEDED"
-          ]
-        }
-      },
-      "Read_blob_content_based_on_URI": {
-        "type": "ServiceProvider",
-        "inputs": {
-          "parameters": {
-            "blobUri": "@triggerBody()?['properties']?['blobFullPathWithContainer']"
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "AzureBlob",
-            "operationId": "readBlobFromUri",
-            "serviceProviderId": "/serviceProviders/AzureBlob"
-          }
-        },
-        "runAfter": {}
-      },
-      "For_each_1": {
-        "type": "foreach",
-        "foreach": "@outputs('Execute_JavaScript_code_1')",
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
         "actions": {
-          "Condition": {
-            "type": "If",
-            "expression": {
-              "and": [
-                {
-                  "less": [
-                    "@items('For_each_1').id",
-                    1000
-                  ]
+            "Parse_JSON": {
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@body('Read_blob_content_based_on_URI')?['content']",
+                    "schema": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "details": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string"
+                                        },
+                                        "severity": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "user": {
+                                    "type": "string"
+                                },
+                                "ip": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "name",
+                                "details",
+                                "user",
+                                "ip"
+                            ]
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Read_blob_content_based_on_URI": [
+                        "SUCCEEDED"
+                    ]
                 }
-              ]
             },
-            "actions": {},
-            "else": {
-              "actions": {
-                "Upload_blob_to_storage_container": {
-                  "type": "ServiceProvider",
-                  "inputs": {
+            "Read_blob_content_based_on_URI": {
+                "type": "ServiceProvider",
+                "inputs": {
                     "parameters": {
-                      "containerName": "/documents-out",
-                      "blobName": "out@{item()['id']}.json",
-                      "content": "@item()",
-                      "overrideIfExists": "true"
+                        "blobUri": "@triggerBody()?['properties']?['blobFullPathWithContainer']"
                     },
                     "serviceProviderConfiguration": {
-                      "connectionName": "AzureBlob",
-                      "operationId": "uploadBlob",
-                      "serviceProviderId": "/serviceProviders/AzureBlob"
+                        "connectionName": "AzureBlob",
+                        "operationId": "readBlobFromUri",
+                        "serviceProviderId": "/serviceProviders/AzureBlob"
                     }
-                  }
+                },
+                "runAfter": {}
+            },
+            "For_each_1": {
+                "type": "foreach",
+                "foreach": "@outputs('Execute_JavaScript_code_1')",
+                "actions": {
+                    "Upload_blob_to_storage_container": {
+                        "type": "ServiceProvider",
+                        "inputs": {
+                            "parameters": {
+                                "containerName": "/documents-out",
+                                "blobName": "out@{item()['id']}-@{body('Call_workflow_in_this_logic_app')}.json",
+                                "content": "@item()",
+                                "overrideIfExists": "true"
+                            },
+                            "serviceProviderConfiguration": {
+                                "connectionName": "AzureBlob",
+                                "operationId": "uploadBlob",
+                                "serviceProviderId": "/serviceProviders/AzureBlob"
+                            }
+                        },
+                        "runAfter": {
+                            "Call_workflow_in_this_logic_app": [
+                                "SUCCEEDED"
+                            ]
+                        }
+                    },
+                    "Call_workflow_in_this_logic_app": {
+                        "type": "Workflow",
+                        "inputs": {
+                            "host": {
+                                "workflow": {
+                                    "id": "MySubWorkflow"
+                                }
+                            },
+                            "body": "@items('For_each_1')"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Execute_JavaScript_code_1": [
+                        "SUCCEEDED"
+                    ]
                 }
-              }
+            },
+            "Execute_JavaScript_code_1": {
+                "type": "JavaScriptCode",
+                "inputs": {
+                    "code": "var body = workflowContext.actions.Parse_JSON.outputs.body;\nreturn body.map(x => ({\n  id: x.id * 100,\n  name: x.name,\n  details: x.details,\n  user: x.user,\n  ip: x.ip\n}));\n"
+                },
+                "runAfter": {
+                    "Parse_JSON": [
+                        "SUCCEEDED"
+                    ]
+                }
             }
-          }
         },
-        "runAfter": {
-          "Execute_JavaScript_code_1": [
-            "SUCCEEDED"
-          ]
-        }
-      },
-      "Execute_JavaScript_code_1": {
-        "type": "JavaScriptCode",
-        "inputs": {
-          "code": "var body = workflowContext.actions.Parse_JSON.outputs.body;\n\nreturn body.map(x => ({\n  id: x.id * 100,\n  name: x.name,\n  details: x.details,\n  user: x.user,\n  ip: x.ip\n}));\n"
-        },
-        "runAfter": {
-          "Call_workflow_in_this_logic_app": [
-            "SUCCEEDED"
-          ]
-        }
-      },
-      "Call_workflow_in_this_logic_app": {
-        "type": "Workflow",
-        "inputs": {
-          "host": {
-            "workflow": {
-              "id": "MySubWorkflow"
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_a_blob_is_added_or_updated": {
+                "type": "ServiceProvider",
+                "inputs": {
+                    "parameters": {
+                        "path": "documents-in/{blobname}"
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "AzureBlob",
+                        "operationId": "whenABlobIsAddedOrModified",
+                        "serviceProviderId": "/serviceProviders/AzureBlob"
+                    }
+                }
             }
-          }
-        },
-        "runAfter": {
-          "Parse_JSON": [
-            "SUCCEEDED"
-          ]
         }
-      }
     },
-    "contentVersion": "1.0.0.0",
-    "outputs": {},
-    "triggers": {
-      "When_a_blob_is_added_or_updated": {
-        "type": "ServiceProvider",
-        "inputs": {
-          "parameters": {
-            "path": "documents-in/{blobname}"
-          },
-          "serviceProviderConfiguration": {
-            "connectionName": "AzureBlob",
-            "operationId": "whenABlobIsAddedOrModified",
-            "serviceProviderId": "/serviceProviders/AzureBlob"
-          }
-        }
-      }
-    }
-  },
-  "kind": "Stateful"
+    "kind": "Stateful"
 }

@@ -1,15 +1,66 @@
 {
-  "definition": {
-    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
-    "actions": {},
-    "contentVersion": "1.0.0.0",
-    "outputs": {},
-    "triggers": {
-      "When_a_HTTP_request_is_received": {
-        "type": "Request",
-        "kind": "Http"
-      }
-    }
-  },
-  "kind": "Stateful"
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Response": {
+                "type": "Response",
+                "kind": "Http",
+                "inputs": {
+                    "statusCode": 200,
+                    "body": "@outputs('Execute_JavaScript_code')"
+                },
+                "runAfter": {
+                    "Execute_JavaScript_code": [
+                        "SUCCEEDED"
+                    ]
+                }
+            },
+            "Execute_JavaScript_code": {
+                "type": "JavaScriptCode",
+                "inputs": {
+                    "code": "return workflowContext.trigger.outputs.body.name.split(\"\").reverse().join(\"\");"
+                },
+                "runAfter": {}
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "When_a_HTTP_request_is_received": {
+                "type": "Request",
+                "kind": "Http",
+                "inputs": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            },
+                            "details": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string"
+                                    },
+                                    "severity": {
+                                        "type": "integer"
+                                    }
+                                }
+                            },
+                            "user": {
+                                "type": "string"
+                            },
+                            "ip": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "kind": "Stateful"
 }
